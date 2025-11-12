@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - claude/whitechapel-terminal-interface-011CV4iMaF2Qxdij2u8KPc1e
-      - main
-      - master
 
 permissions:
   contents: read

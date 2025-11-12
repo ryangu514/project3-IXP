@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whitechapel Terminal</title>
+    <style>
+        /* ===== BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #00ff41;
+            font-family: 'Courier New', 'IBM Plex Mono', monospace;
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ===== CRT EFFECTS ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 999;
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 0.05; }
+            50% { opacity: 0.03; }
+        }
+
+        /* ===== CONTAINER ===== */
+        #app {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            border: 2px solid #00ff41;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            background: rgba(0, 255, 65, 0.03);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        /* ===== MAIN SCREEN ===== */
+        #mainScreen {
+            flex: 1;
+        }
+
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            padding: 15px;
+            margin: 10px 0;
+            border: 1px solid #00ff41;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(0, 255, 65, 0.02);
+        }
+
+        .file-item:hover {
+            background: rgba(0, 255, 65, 0.1);
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .file-item.listened::before {
+            content: '✓ ';
+            color: #00ff41;
+        }
+
+        /* ===== PLAYBACK SCREEN ===== */
+        #playbackScreen {
+            display: none;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .playback-header {
+            padding: 15px;
+            border-bottom: 1px solid #00ff41;
+            margin-bottom: 20px;
+        }
+
+        .playback-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            cursor: pointer;
+        }
+
+        .playback-line {
+            margin: 15px 0;
+            opacity: 0;
+            animation: fadeIn 0.3s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        .return-btn {
+            padding: 15px;
+            border: 1px solid #00ff41;
+            background: rgba(0, 255, 65, 0.05);
+            color: #00ff41;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 20px;
+            transition: all 0.2s;
+        }
+
+        .return-btn:hover {
+            background: rgba(0, 255, 65, 0.15);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        /* ===== ACCESSING FLASH ===== */
+        #accessingFlash {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 30px 50px;
+            border: 2px solid #00ff41;
+            background: #0a0a0a;
+            z-index: 2000;
+            font-size: 1.2rem;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+
+        /* ===== ENDING OVERLAY ===== */
+        #endingOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1500;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            animation: fadeInOverlay 1s forwards;
+            cursor: pointer;
+        }
+
+        @keyframes fadeInOverlay {
+            to { opacity: 1; }
+        }
+
+        .ending-content {
+            padding: 40px;
+            border: 2px solid #00ff41;
+            background: #0a0a0a;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .ending-line {
+            margin: 10px 0;
+            font-size: 1.1rem;
+        }
+
+        /* ===== HELP TEXT ===== */
+        .help-text {
+            margin-top: 30px;
+            padding: 15px;
+            border-top: 1px solid #00ff41;
+            opacity: 0.6;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 600px) {
+            #app {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+
+            .header p {
+                font-size: 0.8rem;
+            }
+
+            .file-item {
+                padding: 12px;
+            }
+
+            .ending-content {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <div class="header">
+            <h1 id="headerTitle"></h1>
+            <p id="headerSubtitle"></p>
+            <p id="headerStatus"></p>
+            <p id="headerPrompt"></p>
+        </div>
+
+        <!-- Main Screen -->
+        <div id="mainScreen">
+            <div id="selectPrompt"></div>
+            <div class="file-list" id="fileList"></div>
+            <div class="help-text" id="helpText"></div>
+        </div>
+
+        <!-- Playback Screen -->
+        <div id="playbackScreen">
+            <div class="playback-header" id="playbackHeader"></div>
+            <div class="playback-content" id="playbackContent"></div>
+            <div class="return-btn" id="returnBtn"></div>
+        </div>
+
+        <!-- Accessing Flash -->
+        <div id="accessingFlash"></div>
+
+        <!-- Ending Overlay -->
+        <div id="endingOverlay">
+            <div class="ending-content" id="endingContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // ===== MODULE: DATA =====
+        const DATA = {
+            "ui": {
+                "title": "LONDON POLICE ARCHIVE SYSTEM",
+                "subtitle": "CASE FILE: WHITECHAPEL_1888",
+                "status": "STATUS: RESTORED",
+                "prompt": "3 AUDIO LOGS AVAILABLE",
+                "select": "Select file to playback:",
+                "accessing": "Accessing file...",
+                "back": "Return to file list",
+                "complete": "All audio fragments restored.",
+                "crossref": "Cross reference complete.",
+                "suspect": "Primary suspect identified: REPORTER_AIDEN.",
+                "closed": "Case File: CLOSED."
+            },
+            "files": [
+                {
+                    "id": "A",
+                    "name": "Detective_Log.wav",
+                    "lines": [
+                        ""Record time: 3:05 a.m."",
+                        ""Female victim found against the wall."",
+                        ""Ground is dry."",
+                        ""A reporter on-site claims discovery at 2:55.""
+                    ]
+                },
+                {
+                    "id": "B",
+                    "name": "Reporter_Record.wav",
+                    "lines": [
+                        ""2:55 a.m."",
+                        ""Whitechapel alley, near the wall."",
+                        ""The woman was already down when I arrived."",
+                        ""My shoes are wet— it was raining.""
+                    ]
+                },
+                {
+                    "id": "C",
+                    "name": "Witness_Statement.wav",
+                    "lines": [
+                        ""I saw a man in the alley."",
+                        ""Something in his hand caught the light."",
+                        ""It never rained that day."",
+                        ""Time was about three.""
+                    ]
+                }
+            ],
+            "ending": [
+                "> All audio fragments restored.",
+                "> Cross reference complete.",
+                "> Primary suspect identified: REPORTER_AIDEN.",
+                "> Case File: CLOSED."
+            ]
+        };
+
+        // ===== MODULE: STATE =====
+        const state = {
+            listenedFiles: new Set(),
+            currentFile: null,
+            isPlaying: false,
+            skipTyping: false
+        };
+
+        // ===== MODULE: RENDER =====
+        function initUI() {
+            // Header
+            document.getElementById('headerTitle').textContent = DATA.ui.title;
+            document.getElementById('headerSubtitle').textContent = DATA.ui.subtitle;
+            document.getElementById('headerStatus').textContent = DATA.ui.status;
+            document.getElementById('headerPrompt').textContent = DATA.ui.prompt;
+
+            // Main screen
+            document.getElementById('selectPrompt').textContent = DATA.ui.select;
+            document.getElementById('helpText').textContent = 'Click a file to play. Press Esc to return. Listen to all files to unlock the ending.';
+
+            // Return button
+            document.getElementById('returnBtn').textContent = DATA.ui.back;
+
+            // Render file list
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            DATA.files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                if (state.listenedFiles.has(file.id)) {
+                    item.classList.add('listened');
+                }
+                item.textContent = `[${file.id}] ${file.name}`;
+                item.addEventListener('click', () => openFile(file.id));
+                fileList.appendChild(item);
+            });
+        }
+
+        function showMainScreen() {
+            document.getElementById('mainScreen').style.display = 'block';
+            document.getElementById('playbackScreen').style.display = 'none';
+            window.scrollTo(0, 0);
+        }
+
+        function showPlaybackScreen() {
+            document.getElementById('mainScreen').style.display = 'none';
+            document.getElementById('playbackScreen').style.display = 'flex';
+        }
+
+        // ===== MODULE: EVENTS =====
+        function openFile(fileId) {
+            if (state.isPlaying) return;
+
+            state.currentFile = fileId;
+            state.skipTyping = false;
+
+            // Show accessing flash
+            const flash = document.getElementById('accessingFlash');
+            flash.textContent = DATA.ui.accessing;
+            flash.style.display = 'block';
+
+            setTimeout(() => {
+                flash.style.display = 'none';
+                playFile(fileId);
+            }, 1000);
+        }
+
+        async function playFile(fileId) {
+            const file = DATA.files.find(f => f.id === fileId);
+            if (!file) return;
+
+            state.isPlaying = true;
+
+            // Set header
+            document.getElementById('playbackHeader').textContent = `▶ ${file.name}`;
+
+            // Clear content
+            const content = document.getElementById('playbackContent');
+            content.innerHTML = '';
+
+            // Show playback screen
+            showPlaybackScreen();
+
+            // Calculate timing for ≤10s total
+            const totalTime = 8000; // 8 seconds for safety margin
+            const totalChars = file.lines.reduce((sum, line) => sum + line.length, 0);
+            const msPerChar = totalTime / totalChars;
+
+            // Type lines
+            for (let i = 0; i < file.lines.length; i++) {
+                if (state.skipTyping) {
+                    // Show all remaining lines instantly
+                    for (let j = i; j < file.lines.length; j++) {
+                        const lineDiv = document.createElement('div');
+                        lineDiv.className = 'playback-line';
+                        lineDiv.textContent = file.lines[j];
+                        content.appendChild(lineDiv);
+                    }
+                    break;
+                } else {
+                    await typeLine(file.lines[i], content, msPerChar);
+                }
+            }
+
+            state.isPlaying = false;
+
+            // Mark as listened
+            if (!state.listenedFiles.has(fileId)) {
+                state.listenedFiles.add(fileId);
+                renderFileList();
+                checkAllListened();
+            }
+        }
+
+        async function typeLine(text, container, msPerChar) {
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'playback-line';
+            container.appendChild(lineDiv);
+
+            for (let i = 0; i < text.length; i++) {
+                if (state.skipTyping) {
+                    lineDiv.textContent = text;
+                    return;
+                }
+                lineDiv.textContent += text[i];
+                await sleep(msPerChar);
+            }
+
+            await sleep(200); // Brief pause between lines
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function returnToList() {
+            if (state.isPlaying) {
+                state.skipTyping = true;
+                setTimeout(() => {
+                    showMainScreen();
+                }, 100);
+            } else {
+                showMainScreen();
+            }
+        }
+
+        function checkAllListened() {
+            if (state.listenedFiles.size === DATA.files.length) {
+                setTimeout(() => {
+                    showEnding();
+                }, 500);
+            }
+        }
+
+        function showEnding() {
+            const overlay = document.getElementById('endingOverlay');
+            const content = document.getElementById('endingContent');
+
+            content.innerHTML = '';
+            DATA.ending.forEach(line => {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'ending-line';
+                lineDiv.textContent = line;
+                content.appendChild(lineDiv);
+            });
+
+            overlay.style.display = 'flex';
+        }
+
+        function closeEnding() {
+            document.getElementById('endingOverlay').style.display = 'none';
+        }
+
+        // ===== MODULE: ANIMATION =====
+        // Skip typing animation on click
+        document.getElementById('playbackContent').addEventListener('click', () => {
+            if (state.isPlaying) {
+                state.skipTyping = true;
+            }
+        });
+
+        // Return button
+        document.getElementById('returnBtn').addEventListener('click', returnToList);
+
+        // Ending overlay click to close
+        document.getElementById('endingOverlay').addEventListener('click', closeEnding);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (document.getElementById('endingOverlay').style.display === 'flex') {
+                    closeEnding();
+                } else if (document.getElementById('playbackScreen').style.display === 'flex') {
+                    returnToList();
+                }
+            }
+        });
+
+        // ===== INIT =====
+        initUI();
+    </script>
+</body>
+</html>

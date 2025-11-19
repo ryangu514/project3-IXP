@@ -1,413 +1,714 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Whitechapel Files — Retro Terminal</title>
-<style>
-  :root{
-    --bg:#0d1b14;
-    --fg:#7aff9b;
-    --dim:#4bd17a;
-    --muted:#2b6a46;
-    --accent:#9cffb3;
-  }
-  html,body{height:100%}
-  body{
-    margin:0;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: "IBM Plex Mono","Courier New",monospace;
-    line-height:1.6;
-    overflow-x:hidden;
-  }
-  /* CRT scanlines + subtle noise */
-  body::before{
-    content:"";
-    position:fixed; inset:0;
-    background:
-      repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 2px, transparent 4px),
-      radial-gradient(ellipse at center, rgba(255,255,255,.04) 0%, transparent 60%);
-    mix-blend-mode: overlay;
-    pointer-events:none;
-  }
-  .wrap{
-    max-width: 920px;
-    margin: 40px auto;
-    padding: 0 16px;
-  }
-  .term{
-    border: 1px solid var(--muted);
-    padding: 20px;
-    box-shadow: 0 0 24px rgba(124,255,155,.08), inset 0 0 24px rgba(124,255,155,.08);
-    position: relative;
-    min-height: 260px;
-  }
-  .hdr{
-    color: var(--accent);
-    margin-bottom: 12px;
-  }
-  .mono{font-family: inherit; white-space: pre-wrap;}
-  .files{margin: 8px 0 0 0; padding:0; list-style:none}
-  .file{
-    display:flex; align-items:center; gap:8px;
-    padding:8px 10px; margin:6px 0;
-    background: rgba(124,255,155,.05);
-    border: 1px solid var(--muted);
-    cursor:pointer; user-select:none;
-    transition: filter .12s ease, background .12s ease, transform .04s ease;
-  }
-  .file:hover{filter: brightness(1.15); background: rgba(124,255,155,.08);}
-  .file:active{transform: translateY(1px);}
-  .file .tag{color: var(--accent); min-width: 40px;}
-  .file .name{flex:1;}
-  .file .status{color: var(--dim)}
-  .muted{color: var(--dim)}
-  .help{color: var(--dim); margin-top: 10px; font-size: 0.95rem}
-  .blink{
-    display:inline-block; width:10px; height:1.2em; vertical-align:baseline; background: var(--fg);
-    animation: blink 1s steps(1,end) infinite; margin-left:4px;
-  }
-  @keyframes blink{50%{opacity:0}}
-  .accessing{
-    position: absolute; inset:0; display:none; align-items:center; justify-content:center;
-    background: rgba(13,27,20,.9); backdrop-filter: blur(2px);
-    color: var(--accent); font-weight: 600;
-  }
-  .accessing.active{display:flex;}
-  .btn{
-    display:inline-block; margin-top:10px; padding:8px 12px;
-    border:1px solid var(--muted); background: rgba(124,255,155,.06);
-    color: var(--fg); text-decoration:none; cursor:pointer;
-    font-family: inherit;
-  }
-  .btn:hover{filter: brightness(1.15)}
-  .btn-row{margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;}
-  .btn.secondary{background: transparent; color: var(--dim);}
-  .log-title{color: var(--accent); margin-bottom: 8px}
-  .log-lines{min-height: 160px; border: 1px dashed var(--muted); padding: 12px;}
-  .overlay{
-    position: fixed; inset:0; background: rgba(13,27,20,.96);
-    color: var(--fg); display:none; align-items:center; justify-content:center; z-index: 10;
-    animation: fadeIn .35s ease;
-  }
-  .overlay.show{display:flex;}
-  .overlay .box{
-    border:1px solid var(--muted); padding:20px; max-width:720px; margin:16px;
-    box-shadow: 0 0 24px rgba(124,255,155,.1), inset 0 0 20px rgba(124,255,155,.08);
-  }
-  @keyframes fadeIn{from{opacity:0} to{opacity:1}}
-  .kbd{border:1px solid var(--muted); padding:2px 6px; font-size:.95em}
-  .footer{margin-top: 14px; color: var(--dim); font-size: .9rem}
-  .clues{
-    margin-top: 18px;
-    border-top:1px dashed var(--muted);
-    padding-top:10px;
-  }
-  .clues-title{color:var(--accent); margin-bottom:4px;}
-  .clue-item{color:var(--dim); font-size:0.95rem; margin:2px 0;}
-  .msg{color:#ffb37a; font-size:0.9rem; margin-top:6px;}
-</style>
+  <meta charset="UTF-8">
+  <title>London Police Archive System</title>
+
+  <!-- Retro terminal font -->
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #050505;
+      --bg-panel: #0c0c0c;
+      --border-soft: #3d3d3d;
+      --border-strong: #6f6f6f;
+      --text-main: #e5e5e5;
+      --text-muted: #8c8c8c;
+      --row-hover: #1a1a1a;
+      --row-active: #232323;
+      --row-played: #2c2c2c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: radial-gradient(circle at center, #111 0, #000 70%);
+      color: var(--text-main);
+      font-family: "VT323", monospace;
+      font-size: 20px;
+      line-height: 1.4;
+      position: relative;
+      perspective: 1000px;
+    }
+
+    /* 扫描线 / 噪点 / CRT 效果 */
+    @keyframes scanMove {
+      from { background-position: 0 0; }
+      to   { background-position: 0 6px; }
+    }
+
+    @keyframes noiseShift {
+      0%   { transform: translate3d(0,0,0); opacity: 0.35; }
+      25%  { transform: translate3d(0,0,0); opacity: 0.32; }
+      50%  { transform: translate3d(0,0,0); opacity: 0.38; }
+      75%  { transform: translate3d(0,0,0); opacity: 0.33; }
+      100% { transform: translate3d(0,0,0); opacity: 0.35; }
+    }
+
+    @keyframes flicker {
+      0%   { opacity: 0.90; }
+      2%   { opacity: 0.85; }
+      4%   { opacity: 0.95; }
+      19%  { opacity: 0.88; }
+      21%  { opacity: 0.98; }
+      23%  { opacity: 0.92; }
+      80%  { opacity: 0.87; }
+      83%  { opacity: 0.96; }
+      87%  { opacity: 0.91; }
+      100% { opacity: 0.90; }
+    }
+
+    @keyframes rgbShift {
+      0%   { text-shadow: 0.3px 0 0 rgba(255,0,0,0.4), -0.3px 0 0 rgba(0,255,255,0.4); }
+      50%  { text-shadow: -0.3px 0 0 rgba(255,0,0,0.4), 0.3px 0 0 rgba(0,255,255,0.4); }
+      100% { text-shadow: 0.3px 0 0 rgba(255,0,0,0.4), -0.3px 0 0 rgba(0,255,255,0.4); }
+    }
+
+    @keyframes boot {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes crtPulse {
+      0%,100% { filter: brightness(0.96); }
+      50%     { filter: brightness(1.04); }
+    }
+
+    @keyframes blink {
+      0%,100% { opacity: 0.35; }
+      50%     { opacity: 0.9; }
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.15) 0px,
+        rgba(0,0,0,0.15) 2px,
+        transparent 2px,
+        transparent 3px,
+        rgba(255,255,255,0.05) 3px,
+        rgba(255,255,255,0.05) 4px,
+        transparent 4px,
+        transparent 6px
+      );
+      opacity: 0.7;
+      z-index: 99999;
+      animation: scanMove 0.15s linear infinite;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25) 0, transparent 35%),
+        radial-gradient(circle at 80% 60%, rgba(255,255,255,0.20) 0, transparent 40%),
+        radial-gradient(circle at 30% 80%, rgba(255,255,255,0.18) 0, transparent 45%),
+        radial-gradient(circle at 60% 10%, rgba(255,255,255,0.15) 0, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.12) 0, transparent 50%),
+        repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 1px, rgba(255,255,255,0.08) 1px, rgba(255,255,255,0.08) 2px);
+      mix-blend-mode: overlay;
+      opacity: 0.6;
+      z-index: 99998;
+      animation: noiseShift 0.3s steps(8) infinite;
+    }
+
+    .wrap::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, transparent 1px, transparent 3px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0px, transparent 1px, transparent 3px);
+      opacity: 0.4;
+      z-index: 99997;
+      mix-blend-mode: multiply;
+    }
+
+    .wrap::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%),
+        linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
+      z-index: 99996;
+      animation: flicker 4s infinite;
+    }
+
+    .wrap {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    #terminal {
+      width: 900px;
+      max-width: 96vw;
+      background: var(--bg-panel);
+      border: 2px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 20px 28px 24px;
+      box-shadow:
+        0 0 45px rgba(0,0,0,0.9),
+        inset 0 0 18px rgba(0,0,0,0.95),
+        0 0 80px rgba(100,200,255,0.15),
+        inset 0 0 60px rgba(100,200,255,0.08);
+      animation: boot 0.6s ease-out forwards, rgbShift 3s infinite alternate;
+      margin: auto;
+      opacity: 0; /* boot 动画会把它拉到 1 */
+    }
+
+    .header-line {
+      margin-bottom: 12px;
+      font-size: 18px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header-left div { white-space: nowrap; }
+
+    #restartBtn {
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-strong);
+      background: #101010;
+      color: var(--text-main);
+      font-family: "VT323", monospace;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #restartBtn:hover {
+      background: #181818;
+    }
+
+    h3 {
+      margin: 4px 0 2px;
+      font-size: 22px;
+      letter-spacing: 0.12em;
+      text-shadow:
+        0 0 10px rgba(229,229,229,0.5),
+        0 0 20px rgba(229,229,229,0.3),
+        0.5px 0 1px rgba(255,100,100,0.3),
+        -0.5px 0 1px rgba(100,255,255,0.3);
+    }
+
+    .logs-list {
+      margin-top: 6px;
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+
+    .log-row {
+      background: #111;
+      border-bottom: 1px solid #242424;
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: opacity 0.2s;
+    }
+
+    .log-row:hover { background: var(--row-hover); }
+    .log-row.active { background: var(--row-active); }
+    .log-row.played { background: var(--row-played); }
+    .log-row.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .log-label {
+      width: 40px;
+      margin-right: 10px;
+      color: var(--text-muted);
+    }
+
+    .log-title {
+      flex: 1;
+      text-align: left;
+    }
+
+    .checkmark {
+      width: 20px;
+      text-align: right;
+      opacity: 0;
+      color: var(--text-main);
+    }
+    .log-row.played .checkmark { opacity: 1; }
+
+    .small-help {
+      margin-top: 4px;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    #playback {
+      margin-top: 12px;
+      padding-top: 8px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    #imagePane {
+      flex: 0.9;
+      min-height: 200px;
+      background: #070707;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #imagePane::before {
+      content: "[ SCENE IMAGE ]";
+      position: absolute;
+      top: 6px; left: 8px;
+      font-size: 14px;
+      color: var(--text-muted);
+      z-index: 2;
+    }
+
+    /* 统一调色 overlay */
+    #imagePane::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: rgba(40,40,40,0.2);
+      mix-blend-mode: multiply;
+      z-index: 1;
+    }
+
+    #sceneImage {
+      width: 100%;
+      margin-top: 22px;
+      filter:
+        grayscale(100%)
+        contrast(1.15)
+        brightness(0.95)
+        sepia(0.12)
+        blur(0.3px);
+      box-shadow:
+        0 0 20px rgba(255,255,255,0.1),
+        inset 0 0 40px rgba(0,0,0,0.3);
+      position: relative;
+      z-index: 0;
+    }
+
+    #textPane {
+      flex: 1.45;
+      min-height: 200px;
+      padding: 8px 10px;
+      background: #0b0b0b;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
+      font-size: 18px;
+      white-space: pre-wrap;
+      color: #e2e2e2;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+      position: relative;
+      animation: crtPulse 2.4s infinite ease-in-out;
+    }
+
+    #textPane:hover { background: #0d0d0d; }
+
+    #skipHint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 14px;
+      color: #666;
+      opacity: 0.7;
+      animation: blink 1s infinite;
+    }
+
+    #clues {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-soft);
+      font-size: 18px;
+    }
+
+    #suspectSection {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 2px solid var(--border-strong);
+      border-radius: 8px;
+      background: #0a0a0a;
+      box-shadow:
+        0 0 20px rgba(100,200,255,0.1),
+        inset 0 0 20px rgba(0,0,0,0.5);
+      display: none;
+    }
+
+    .suspectBtn {
+      padding: 6px 16px;
+      margin-right: 0;
+      border: 2px solid #4a4a4a;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+      color: var(--text-main);
+      cursor: pointer;
+      font-family: "VT323", monospace;
+      font-size: 19px;
+      transition: all 0.2s;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .suspectBtn:hover {
+      background: linear-gradient(180deg, #252525 0%, #151515 100%);
+      border-color: #6f6f6f;
+      box-shadow: 0 0 15px rgba(100,200,255,0.3);
+    }
+    .suspectBtn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    #resultMsg {
+      margin-top: 10px;
+      padding: 8px;
+      font-size: 18px;
+      color: var(--text-main);
+      background: #050505;
+      border-radius: 4px;
+      border-left: 3px solid var(--border-strong);
+      min-height: 20px;
+    }
+  </style>
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="term" id="app">
-      <div class="accessing" id="accessing"></div>
-    </div>
-  </div>
+<!-- 额外噪点层 -->
+<div style="
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('data:image/svg+xml,%3Csvg viewBox=\"0 0 200 200\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cfilter id=\"noise\"%3E%3CfeTurbulence type=\"fractalNoise\" baseFrequency=\"1.2\" numOctaves=\"5\" stitchTiles=\"stitch\"/%3E%3C/filter%3E%3Crect width=\"100%25\" height=\"100%25\" filter=\"url(%23noise)\" opacity=\"0.5\"/%3E%3C/svg%3E');
+  opacity: 0.35;
+  z-index: 99995;
+  mix-blend-mode: soft-light;
+"></div>
 
-  <!-- Ending overlay -->
-  <div class="overlay" id="ending">
-    <div class="box mono" id="endingBox"></div>
-  </div>
-
-  <!-- Accuse overlay -->
-  <div class="overlay" id="accuseOverlay">
-    <div class="box mono" id="accuseBox">
-      <div>> Select suspect to accuse:</div>
-      <div class="btn-row">
-        <button class="btn" id="accuseReporter">Reporter Aiden</button>
-        <button class="btn secondary" id="accuseUnknown">Someone else / Not sure</button>
+<div class="wrap">
+  <div id="terminal">
+    <div class="header-line">
+      <div class="header-left">
+        <div>&gt; LONDON POLICE ARCHIVE SYSTEM</div>
+        <div>&gt; CASE FILE: WHITECHAPEL_1888</div>
+        <div>&gt; STATUS: RESTORED</div>
       </div>
-      <div class="msg" id="accuseHint"></div>
+      <button id="restartBtn" onclick="restartCase()">&gt; RESTART CASE</button>
     </div>
+
+    <h3>3 AUDIO LOGS AVAILABLE</h3>
+    <div>Select file to playback:</div>
+
+    <div class="logs-list">
+      <div class="log-row" onclick="playLog('A')" id="rowA">
+        <span class="log-label">[A]</span>
+        <span class="log-title">Detective_Log.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
+      <div class="log-row" onclick="playLog('B')" id="rowB">
+        <span class="log-label">[B]</span>
+        <span class="log-title">Reporter_Record.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
+      <div class="log-row" onclick="playLog('C')" id="rowC">
+        <span class="log-label">[C]</span>
+        <span class="log-title">Witness_Statement.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
+    </div>
+
+    <div class="small-help">
+      • Click a file to play. Click text area to skip typing animation.
+    </div>
+
+    <div id="playback">
+      <!-- 默认占位图：default_scene.png -->
+      <div id="imagePane">
+        <img id="sceneImage" src="default_scene.png" alt="scene image">
+      </div>
+      <div id="textPane" onclick="skipTyping()">
+&gt; Select a log on the left to begin playback.
+      </div>
+    </div>
+
+    <div id="clues">
+      <strong>Unlocked Clues:</strong>
+      <ul id="clueList"></ul>
+    </div>
+
+    <div id="suspectSection">
+      <div style="margin-bottom: 8px; font-size: 19px; letter-spacing: 0.08em;">
+        <strong>&gt; SUBMIT ACCUSATION</strong>
+      </div>
+      <div style="margin-bottom: 6px; color: var(--text-muted); font-size: 17px;">
+        Select the suspect:
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="suspectBtn" onclick="checkSuspect('detective')">Detective</button>
+        <button class="suspectBtn" onclick="checkSuspect('reporter')">Reporter</button>
+        <button class="suspectBtn" onclick="checkSuspect('witness')">Witness</button>
+      </div>
+      <div id="resultMsg"></div>
+    </div>
+
   </div>
+</div>
 
 <script>
-/* =========================
-   DATA
-========================= */
-const DATA = {
-  ui: {
-    title: "LONDON POLICE ARCHIVE SYSTEM",
-    subtitle: "CASE FILE: WHITECHAPEL_1888",
-    status: "STATUS: RESTORED",
-    prompt: "3 AUDIO LOGS AVAILABLE",
-    select: "Select file to playback:",
-    accessing: "Accessing file...",
-    back: "Return to file list",
-    complete: "All audio fragments restored.",
-    crossref: "Cross reference complete.",
-    suspect: "Primary suspect identified: REPORTER_AIDEN.",
-    closed: "Case File: CLOSED.",
-    help: "Click a file to play. Press Esc to return. Read the clues, then decide who you want to accuse."
-  },
-  files: [
-    {
-      id: "A",
-      name: "Detective_Log.wav",
-      lines: [
-        "“Record time: 3:05 a.m.”",
-        "“Female victim found against the wall.”",
-        "“Ground surface is dry.”",
-        "“A reporter is on scene,”",
-        "“He claims he discovered the body at 2:55.”"
-      ],
-      clue: "Clue A: When the detective arrives at 3:05, the ground is dry — but the reporter says it was still raining at 2:55."
+  const logs = {
+    A: {
+      text:`[Detective Log - 3:05 AM]
+
+Arrived at scene at 3:05 AM.
+Body is leaning against the wall, but the posture is unnatural.
+
+Based on blood pattern analysis, she should have fallen forward,
+not positioned against the wall as she is now.
+
+No drag marks detected, movements were careful.
+This indicates someone repositioned the body.
+
+The killer must have been very close to her, and remained calm.`,
+      img: "detective.png",
+      clue: "Body posture is unnatural, indicating it was repositioned by someone."
     },
-    {
-      id: "B",
-      name: "Reporter_Record.wav",
-      lines: [
-        "“2:55 a.m.”",
-        "“Whitechapel alley, near the wall.”",
-        "“The woman was already down when I arrived.”",
-        "“My shoes are wet — it was raining.”"
-      ],
-      clue: "Clue B: The reporter says he found the body at 2:55, ten minutes before the detective."
+    B: {
+      text:`[Reporter Record - Claims 2:55 AM]
+
+I arrived around 2:55 AM.
+She was already sitting against the wall, just like in the photos later.
+
+I didn't get close, stayed at the alley entrance,
+only saw her silhouette from a distance.
+
+She appeared to be sitting facing the street,
+as if waiting for someone.`,
+      img: "reporter.png",
+      clue: "Reporter claims to only observe from distance at alley entrance, yet describes body's facing direction."
     },
-    {
-      id: "C",
-      name: "Witness_Statement.wav",
-      lines: [
-        "“I saw a man in the alley,”",
-        "“He was holding something that caught the light.”",
-        "“It never rained that day.”",
-        "“The time was around three.”"
-      ],
-      clue: "Clue C: The witness remembers it never rained that day, and sees a man holding something reflective."
+    C: {
+      text:`[Witness Statement - Around 3:00 AM]
+
+I passed by that alley around 3 AM.
+
+I saw a man very close to her,
+close enough as if checking whether she was dead.
+
+He wasn't at the alley entrance,
+he was crouched right in front of her.
+
+I saw something in his hand reflecting light,
+looked like a metal pen.`,
+      img: "witness.png",
+      clue: "Witness saw man directly in front of the body, holding reflective metal object."
     }
-  ],
-  ending: [
-    "> All audio fragments restored.",
-    "> Cross reference complete.",
-    "> Primary suspect identified: REPORTER_AIDEN.",
-    "> Case File: CLOSED."
-  ]
-};
+  };
 
-/* =========================
-   STATE
-========================= */
-const state = {
-  listened: new Set(),
-  current: null,
-  typing: {skippable:false, skipping:false}
-};
+  const defaultText = "> Select a log on the left to begin playback.";
+  let unlocked = [];
+  let isTyping = false;
+  let currentTimer = null;
+  let fullText = "";
+  let typingCallback = null;
 
-/* =========================
-   HELPERS
-========================= */
-const $ = sel => document.querySelector(sel);
-const app = $("#app");
-const overlayEnding = $("#ending");
-const endingBox = $("#endingBox");
-const overlayAccuse = $("#accuseOverlay");
-const accuseHint = $("#accuseHint");
-const accessing = $("#accessing");
+  function skipTyping() {
+    if (!isTyping || !currentTimer) return;
+    clearInterval(currentTimer);
+    currentTimer = null;
+    isTyping = false;
 
-function showAccessing(msg){
-  accessing.textContent = msg || DATA.ui.accessing;
-  accessing.classList.add("active");
-}
-function hideAccessing(){ accessing.classList.remove("active"); }
+    const textEl = document.getElementById("textPane");
+    textEl.textContent = fullText;
 
-function allListened(){
-  return DATA.files.every(f => state.listened.has(f.id));
-}
+    const hint = document.getElementById("skipHint");
+    if (hint) hint.remove();
 
-function resetScroll(){ window.scrollTo({top:0}); }
-
-/* =========================
-   RENDER — LIST
-========================= */
-function renderList(){
-  state.current = null;
-
-  const cluesHTML = DATA.files
-    .filter(f => state.listened.has(f.id))
-    .map(f => `<div class="clue-item">- ${f.clue}</div>`)
-    .join("");
-
-  const accuseButton = allListened()
-    ? `<div class="btn-row">
-         <button class="btn mono" id="accuseBtn">Accuse suspect</button>
-       </div>
-       <div class="msg">You have unlocked all clues. Use them to decide who is responsible.</div>`
-    : `<div class="msg">Collect more clues before you accuse anyone.</div>`;
-
-  app.innerHTML = `
-    <div class="hdr mono">
-      > ${DATA.ui.title}\n> ${DATA.ui.subtitle}\n> ${DATA.ui.status}
-    </div>
-    <div class="mono">${DATA.ui.prompt}</div>
-    <div class="mono">${DATA.ui.select}</div>
-    <ul class="files" id="fileList">
-      ${DATA.files.map(f=>{
-        const tick = state.listened.has(f.id) ? ' <span class="status">✓</span>' : '';
-        return `<li class="file" data-id="${f.id}" tabindex="0">
-                  <span class="tag">[${f.id}]</span>
-                  <span class="name">${f.name}</span>
-                  ${tick}
-                </li>`;
-      }).join("")}
-    </ul>
-    <div class="help mono">• ${DATA.ui.help}</div>
-    <div class="footer">Press <span class="kbd">Enter</span> to open selected file · <span class="kbd">Esc</span> to return</div>
-
-    <div class="clues mono">
-      <div class="clues-title">Unlocked clues:</div>
-      ${cluesHTML || '<div class="clue-item muted">No clues yet. Listen to the logs.</div>'}
-      ${accuseButton}
-    </div>
-  `;
-  bindListEvents();
-  bindAccuseButton();
-}
-
-function bindListEvents(){
-  const list = $("#fileList");
-  list.addEventListener("click", (e)=>{
-    const li = e.target.closest(".file");
-    if(!li) return;
-    openFile(li.dataset.id);
-  });
-  list.addEventListener("keydown", (e)=>{
-    if(e.key === "Enter"){
-      const li = e.target.closest(".file");
-      if(li) openFile(li.dataset.id);
+    if (typingCallback) {
+      typingCallback();
+      typingCallback = null;
     }
-  });
-}
 
-function bindAccuseButton(){
-  const btn = $("#accuseBtn");
-  if(!btn) return;
-  btn.addEventListener("click", ()=>{
-    accuseHint.textContent = "";
-    overlayAccuse.classList.add("show");
-  });
-}
-
-/* =========================
-   RENDER — PLAYER
-========================= */
-function openFile(id){
-  const file = DATA.files.find(f=>f.id===id);
-  if(!file) return;
-  showAccessing();
-  setTimeout(()=>{
-    hideAccessing();
-    state.current = id;
-    state.typing.skipping = false;
-    app.innerHTML = `
-      <div class="hdr mono">> ${DATA.ui.title}\n> ${DATA.ui.subtitle}\n> FILE: [${file.id}] ${file.name}</div>
-      <div class="log-title mono">Playback (click text to skip typing)<span class="blink"></span></div>
-      <div class="log-lines mono" id="logBox" tabindex="0" aria-live="polite"></div>
-      <button class="btn mono" id="backBtn">${DATA.ui.back}</button>
-    `;
-    typeLines(file.lines, $("#logBox")).then(()=>{
-      state.listened.add(file.id);
-      $("#backBtn")?.focus();
+    ["A","B","C"].forEach(k => {
+      document.getElementById("row"+k).classList.remove("disabled");
     });
-    $("#backBtn").addEventListener("click", ()=> { renderList(); resetScroll(); });
-    document.onkeydown = (ev)=>{
-      if(ev.key === "Escape"){ renderList(); resetScroll(); }
-    };
-  }, 600);
-}
-
-/* typing animation with skip */
-function typeLines(lines, container){
-  return new Promise(async (resolve)=>{
-    state.typing.skippable = true;
-    state.typing.skipping = false;
-
-    function typeLine(text){
-      return new Promise(res=>{
-        let i=0;
-        const span = document.createElement("div");
-        container.appendChild(span);
-        const speed = 18;
-        const timer = setInterval(()=>{
-          if(state.typing.skipping){
-            span.textContent = text;
-            clearInterval(timer); res();
-            return;
-          }
-          span.textContent = text.slice(0, ++i);
-          if(i>=text.length){ clearInterval(timer); res(); }
-        }, speed);
-      });
-    }
-
-    container.addEventListener("click", ()=>{
-      if(state.typing.skippable){
-        state.typing.skipping = true;
-      }
-    }, {once:false});
-
-    for(const line of lines){
-      if(state.typing.skipping){
-        const d = document.createElement("div");
-        d.textContent = line;
-        container.appendChild(d);
-      }else{
-        await typeLine(line);
-        await new Promise(r=>setTimeout(r, 140));
-      }
-    }
-
-    state.typing.skippable = false;
-    const end = document.createElement("div");
-    end.innerHTML = '<span class="blink"></span>';
-    container.appendChild(end);
-
-    resolve();
-  });
-}
-
-/* =========================
-   ENDING & ACCUSE
-========================= */
-function showEnding(){
-  endingBox.innerHTML = DATA.ending.map(l=>`${l}`).join("\n");
-  overlayEnding.classList.add("show");
-}
-overlayEnding.addEventListener("click", ()=> overlayEnding.classList.remove("show"));
-
-overlayAccuse.addEventListener("click",(e)=>{
-  if(e.target === overlayAccuse){ overlayAccuse.classList.remove("show"); }
-});
-document.addEventListener("keydown", (e)=>{
-  if(e.key === "Escape"){
-    overlayEnding.classList.remove("show");
-    overlayAccuse.classList.remove("show");
   }
-});
 
-$("#accuseReporter").addEventListener("click", ()=>{
-  overlayAccuse.classList.remove("show");
-  showEnding();
-});
-$("#accuseUnknown").addEventListener("click", ()=>{
-  accuseHint.textContent = "System hint: time, weather and scene all contradict the reporter's story. Check the three logs again.";
-});
+  function playLog(key) {
+    if (isTyping) return;
 
-/* =========================
-   INIT
-========================= */
-renderList();
+    ["A","B","C"].forEach(k => {
+      const row = document.getElementById("row"+k);
+      row.classList.remove("active");
+      row.classList.add("disabled");
+      row.title = "Disabled during playback";
+    });
+
+    const currentRow = document.getElementById("row"+key);
+    currentRow.classList.remove("disabled");
+    currentRow.classList.add("active");
+
+    const log = logs[key];
+
+    const sceneImg = document.getElementById("sceneImage");
+    if (sceneImg) {
+      sceneImg.src = log.img;
+      sceneImg.alt = "scene image - " + key;
+    }
+
+    typeText(log.text, document.getElementById("textPane"), () => {
+      unlockClue(log.clue);
+      markPlayed(key);
+      ["A","B","C"].forEach(k => {
+        const row = document.getElementById("row"+k);
+        row.classList.remove("disabled");
+        row.title = "";
+      });
+    });
+  }
+
+  function markPlayed(k) {
+    document.getElementById("row"+k).classList.add("played");
+  }
+
+  function unlockClue(c) {
+    if (!unlocked.includes(c)) unlocked.push(c);
+
+    document.getElementById("clueList").innerHTML =
+      unlocked.map((v, i) => `<li>[${i+1}] ${v}</li>`).join("");
+
+    if (unlocked.length === 3) {
+      document.getElementById("suspectSection").style.display = "block";
+    }
+  }
+
+  function typeText(text, el, callback) {
+    if (currentTimer) {
+      clearInterval(currentTimer);
+    }
+
+    fullText = text;
+    typingCallback = callback;
+    isTyping = true;
+    el.textContent = "";
+    let i = 0;
+
+    const skipHint = document.createElement("div");
+    skipHint.id = "skipHint";
+    skipHint.textContent = "[Click to skip]";
+    el.appendChild(skipHint);
+
+    currentTimer = setInterval(() => {
+      el.textContent = text.substring(0, i);
+      i++;
+      if (i > text.length) {
+        clearInterval(currentTimer);
+        currentTimer = null;
+        isTyping = false;
+        const hint = document.getElementById("skipHint");
+        if (hint) hint.remove();
+        callback && callback();
+        typingCallback = null;
+      }
+    }, 40);
+  }
+
+  function checkSuspect(choice) {
+    document.querySelectorAll(".suspectBtn").forEach(b => b.disabled = true);
+    const result = document.getElementById("resultMsg");
+
+    if (choice === "reporter") {
+      result.innerHTML =
+        "&gt; <strong style='color: #7f7;'>CORRECT</strong><br>Only the reporter could describe the body position from the killer's perspective.";
+      result.style.borderLeftColor = "#7f7";
+    } else {
+      result.innerHTML =
+        "&gt; <strong style='color: #f77;'>INCORRECT</strong><br>The evidence does not support this accusation.";
+      result.style.borderLeftColor = "#f77";
+    }
+  }
+
+  /* Restart Case：重置所有状态 */
+  function restartCase() {
+    // 先把打字机停掉
+    if (isTyping && currentTimer) {
+      clearInterval(currentTimer);
+      currentTimer = null;
+      isTyping = false;
+    }
+
+    // 图像恢复默认
+    const sceneImg = document.getElementById("sceneImage");
+    if (sceneImg) {
+      sceneImg.src = "default_scene.png";
+      sceneImg.alt = "scene image";
+    }
+
+    // 文本恢复默认
+    const textEl = document.getElementById("textPane");
+    textEl.textContent = defaultText;
+
+    // 线索重置
+    unlocked = [];
+    document.getElementById("clueList").innerHTML = "";
+
+    // 行状态重置
+    ["A","B","C"].forEach(k => {
+      const row = document.getElementById("row"+k);
+      row.classList.remove("active","played","disabled");
+      row.title = "";
+    });
+
+    // 嫌疑区重置
+    const section = document.getElementById("suspectSection");
+    section.style.display = "none";
+    const result = document.getElementById("resultMsg");
+    result.textContent = "";
+    result.style.borderLeftColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--border-strong');
+
+    document.querySelectorAll(".suspectBtn").forEach(b => b.disabled = false);
+  }
 </script>
 </body>
 </html>

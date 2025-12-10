@@ -272,21 +272,56 @@
             const memoryImage = document.getElementById('memory-image');
             const closeBtn = document.getElementById('close-btn');
 
-            startBtn.addEventListener('click', () => { document.body.requestPointerLock(); AudioSys.init(); });
-            
-            document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement === document.body) {
-                    isLocked = true; uiLayer.style.opacity = 0;
-                    setTimeout(()=> uiLayer.style.display='none', 500); crosshair.style.display = 'block';
-                } else {
+            // Start game function
+            function startGame() {
+                AudioSys.init();
+                isLocked = true;
+                uiLayer.style.opacity = 0;
+                setTimeout(() => {
+                    uiLayer.style.display = 'none';
+                    crosshair.style.display = 'block';
+                }, 500);
+
+                // Try to request pointer lock (may fail in some contexts, but game still works)
+                document.body.requestPointerLock().catch(() => {
+                    console.log('Pointer lock not available, but game will still work');
+                });
+            }
+
+            startBtn.addEventListener('click', startGame);
+
+            // Handle pointer lock changes (with browser prefixes)
+            function onPointerLockChange() {
+                const isPointerLocked = document.pointerLockElement === document.body ||
+                                       document.mozPointerLockElement === document.body ||
+                                       document.webkitPointerLockElement === document.body;
+
+                if (!isPointerLocked && isLocked && memoryOverlay.style.display !== 'flex') {
+                    // Pointer lock lost, but don't exit game unless user presses ESC
+                }
+            }
+
+            document.addEventListener('pointerlockchange', onPointerLockChange);
+            document.addEventListener('mozpointerlockchange', onPointerLockChange);
+            document.addEventListener('webkitpointerlockchange', onPointerLockChange);
+
+            // Handle keyboard input
+            document.addEventListener('keydown', (e) => {
+                // Handle ESC to exit game
+                if (e.code === 'Escape' && isLocked && memoryOverlay.style.display !== 'flex') {
                     isLocked = false;
-                    if (memoryOverlay.style.display !== 'flex') {
-                        uiLayer.style.display = 'flex'; setTimeout(()=> uiLayer.style.opacity = 1, 10); crosshair.style.display = 'none';
-                    }
+                    uiLayer.style.display = 'flex';
+                    setTimeout(() => uiLayer.style.opacity = 1, 10);
+                    crosshair.style.display = 'none';
+                }
+                // Handle WASD movement
+                switch(e.code) {
+                    case 'KeyW': moveState.forward = true; break;
+                    case 'KeyS': moveState.backward = true; break;
+                    case 'KeyA': moveState.left = true; break;
+                    case 'KeyD': moveState.right = true; break;
                 }
             });
-            
-            document.addEventListener('keydown', (e) => { switch(e.code) { case 'KeyW': moveState.forward = true; break; case 'KeyS': moveState.backward = true; break; case 'KeyA': moveState.left = true; break; case 'KeyD': moveState.right = true; break; } });
             document.addEventListener('keyup', (e) => { switch(e.code) { case 'KeyW': moveState.forward = false; break; case 'KeyS': moveState.backward = false; break; case 'KeyA': moveState.left = false; break; case 'KeyD': moveState.right = false; break; } });
 
             document.addEventListener('mousemove', (e) => {

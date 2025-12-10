@@ -1,391 +1,714 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Dreamcore Meadow (Final Fix)</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&display=swap');
+  <meta charset="UTF-8">
+  <title>London Police Archive System</title>
 
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Comfortaa', cursive; }
+  <!-- Retro terminal font -->
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 
-        #ui-layer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            background: rgba(135, 206, 235, 1.0);
-            transition: opacity 0.8s; z-index: 10;
-        }
+  <style>
+    :root {
+      --bg-dark: #050505;
+      --bg-panel: #0c0c0c;
+      --border-soft: #3d3d3d;
+      --border-strong: #6f6f6f;
+      --text-main: #e5e5e5;
+      --text-muted: #8c8c8c;
+      --row-hover: #1a1a1a;
+      --row-active: #232323;
+      --row-played: #2c2c2c;
+    }
 
-        h1 { margin: 0; font-size: 60px; color: #fff; text-shadow: 3px 3px 0px #ff99cc; }
-        p { color: #fff; font-size: 18px; margin-top: 10px; font-weight: bold; }
+    * { box-sizing: border-box; }
 
-        .click-start {
-            margin-top: 30px; padding: 15px 50px; background: #fff; color: #87CEEB;
-            border: 4px solid #fff; border-radius: 50px; cursor: pointer; font-size: 16px; font-weight: 900;
-            box-shadow: 0 10px 20px rgba(135, 206, 235, 0.4); transition: transform 0.1s;
-        }
-        .click-start:active { transform: translateY(3px); }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
 
-        #hud {
-            position: absolute; bottom: 20px; left: 20px; color: #fff; font-size: 14px; font-weight: bold;
-            text-shadow: 1px 1px 0 rgba(0,0,0,0.1); pointer-events: none; z-index: 5;
-        }
+    body {
+      background: radial-gradient(circle at center, #111 0, #000 70%);
+      color: var(--text-main);
+      font-family: "VT323", monospace;
+      font-size: 20px;
+      line-height: 1.4;
+      position: relative;
+      perspective: 1000px;
+    }
 
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; background: #fff;
-            border-radius: 50%; border: 3px solid #ff99cc; transform: translate(-50%, -50%);
-            pointer-events: none; z-index: 5; display: none;
-        }
+    /* 扫描线 / 噪点 / CRT 效果 */
+    @keyframes scanMove {
+      from { background-position: 0 0; }
+      to   { background-position: 0 6px; }
+    }
 
-        #memory-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(8px);
-            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20;
-        }
+    @keyframes noiseShift {
+      0%   { transform: translate3d(0,0,0); opacity: 0.35; }
+      25%  { transform: translate3d(0,0,0); opacity: 0.32; }
+      50%  { transform: translate3d(0,0,0); opacity: 0.38; }
+      75%  { transform: translate3d(0,0,0); opacity: 0.33; }
+      100% { transform: translate3d(0,0,0); opacity: 0.35; }
+    }
 
-        #memory-content {
-            width: 60%; max-width: 700px; aspect-ratio: 16/9; background: #000;
-            border: 8px solid #fff; border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(100, 149, 237, 0.3);
-            display: flex; align-items: center; justify-content: center; overflow: hidden;
-        }
+    @keyframes flicker {
+      0%   { opacity: 0.90; }
+      2%   { opacity: 0.85; }
+      4%   { opacity: 0.95; }
+      19%  { opacity: 0.88; }
+      21%  { opacity: 0.98; }
+      23%  { opacity: 0.92; }
+      80%  { opacity: 0.87; }
+      83%  { opacity: 0.96; }
+      87%  { opacity: 0.91; }
+      100% { opacity: 0.90; }
+    }
 
-        #memory-content img { width: 100%; height: 100%; object-fit: cover; }
+    @keyframes rgbShift {
+      0%   { text-shadow: 0.3px 0 0 rgba(255,0,0,0.4), -0.3px 0 0 rgba(0,255,255,0.4); }
+      50%  { text-shadow: -0.3px 0 0 rgba(255,0,0,0.4), 0.3px 0 0 rgba(0,255,255,0.4); }
+      100% { text-shadow: 0.3px 0 0 rgba(255,0,0,0.4), -0.3px 0 0 rgba(0,255,255,0.4); }
+    }
 
-        #close-btn {
-            margin-top: 25px; padding: 12px 40px; background: #ff99cc; color: #fff; border: none;
-            cursor: pointer; border-radius: 30px; font-weight: 900; font-size: 14px;
-            transition: transform 0.1s;
-        }
-        #close-btn:hover { transform: scale(1.05); }
-    </style>
+    @keyframes boot {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes crtPulse {
+      0%,100% { filter: brightness(0.96); }
+      50%     { filter: brightness(1.04); }
+    }
+
+    @keyframes blink {
+      0%,100% { opacity: 0.35; }
+      50%     { opacity: 0.9; }
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0,0,0,0.15) 0px,
+        rgba(0,0,0,0.15) 2px,
+        transparent 2px,
+        transparent 3px,
+        rgba(255,255,255,0.05) 3px,
+        rgba(255,255,255,0.05) 4px,
+        transparent 4px,
+        transparent 6px
+      );
+      opacity: 0.7;
+      z-index: 99999;
+      animation: scanMove 0.15s linear infinite;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25) 0, transparent 35%),
+        radial-gradient(circle at 80% 60%, rgba(255,255,255,0.20) 0, transparent 40%),
+        radial-gradient(circle at 30% 80%, rgba(255,255,255,0.18) 0, transparent 45%),
+        radial-gradient(circle at 60% 10%, rgba(255,255,255,0.15) 0, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.12) 0, transparent 50%),
+        repeating-radial-gradient(circle at 50% 50%, transparent 0, transparent 1px, rgba(255,255,255,0.08) 1px, rgba(255,255,255,0.08) 2px);
+      mix-blend-mode: overlay;
+      opacity: 0.6;
+      z-index: 99998;
+      animation: noiseShift 0.3s steps(8) infinite;
+    }
+
+    .wrap::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.3) 0px, transparent 1px, transparent 3px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0px, transparent 1px, transparent 3px);
+      opacity: 0.4;
+      z-index: 99997;
+      mix-blend-mode: multiply;
+    }
+
+    .wrap::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.5) 100%),
+        linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
+      z-index: 99996;
+      animation: flicker 4s infinite;
+    }
+
+    .wrap {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    #terminal {
+      width: 900px;
+      max-width: 96vw;
+      background: var(--bg-panel);
+      border: 2px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 20px 28px 24px;
+      box-shadow:
+        0 0 45px rgba(0,0,0,0.9),
+        inset 0 0 18px rgba(0,0,0,0.95),
+        0 0 80px rgba(100,200,255,0.15),
+        inset 0 0 60px rgba(100,200,255,0.08);
+      animation: boot 0.6s ease-out forwards, rgbShift 3s infinite alternate;
+      margin: auto;
+      opacity: 0; /* boot 动画会把它拉到 1 */
+    }
+
+    .header-line {
+      margin-bottom: 12px;
+      font-size: 18px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .header-left div { white-space: nowrap; }
+
+    #restartBtn {
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-strong);
+      background: #101010;
+      color: var(--text-main);
+      font-family: "VT323", monospace;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #restartBtn:hover {
+      background: #181818;
+    }
+
+    h3 {
+      margin: 4px 0 2px;
+      font-size: 22px;
+      letter-spacing: 0.12em;
+      text-shadow:
+        0 0 10px rgba(229,229,229,0.5),
+        0 0 20px rgba(229,229,229,0.3),
+        0.5px 0 1px rgba(255,100,100,0.3),
+        -0.5px 0 1px rgba(100,255,255,0.3);
+    }
+
+    .logs-list {
+      margin-top: 6px;
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+
+    .log-row {
+      background: #111;
+      border-bottom: 1px solid #242424;
+      padding: 6px 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: opacity 0.2s;
+    }
+
+    .log-row:hover { background: var(--row-hover); }
+    .log-row.active { background: var(--row-active); }
+    .log-row.played { background: var(--row-played); }
+    .log-row.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .log-label {
+      width: 40px;
+      margin-right: 10px;
+      color: var(--text-muted);
+    }
+
+    .log-title {
+      flex: 1;
+      text-align: left;
+    }
+
+    .checkmark {
+      width: 20px;
+      text-align: right;
+      opacity: 0;
+      color: var(--text-main);
+    }
+    .log-row.played .checkmark { opacity: 1; }
+
+    .small-help {
+      margin-top: 4px;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    #playback {
+      margin-top: 12px;
+      padding-top: 8px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    #imagePane {
+      flex: 0.9;
+      min-height: 200px;
+      background: #070707;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #imagePane::before {
+      content: "[ SCENE IMAGE ]";
+      position: absolute;
+      top: 6px; left: 8px;
+      font-size: 14px;
+      color: var(--text-muted);
+      z-index: 2;
+    }
+
+    /* 统一调色 overlay */
+    #imagePane::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: rgba(40,40,40,0.2);
+      mix-blend-mode: multiply;
+      z-index: 1;
+    }
+
+    #sceneImage {
+      width: 100%;
+      margin-top: 22px;
+      filter:
+        grayscale(100%)
+        contrast(1.15)
+        brightness(0.95)
+        sepia(0.12)
+        blur(0.3px);
+      box-shadow:
+        0 0 20px rgba(255,255,255,0.1),
+        inset 0 0 40px rgba(0,0,0,0.3);
+      position: relative;
+      z-index: 0;
+    }
+
+    #textPane {
+      flex: 1.45;
+      min-height: 200px;
+      padding: 8px 10px;
+      background: #0b0b0b;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
+      font-size: 18px;
+      white-space: pre-wrap;
+      color: #e2e2e2;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+      position: relative;
+      animation: crtPulse 2.4s infinite ease-in-out;
+    }
+
+    #textPane:hover { background: #0d0d0d; }
+
+    #skipHint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 14px;
+      color: #666;
+      opacity: 0.7;
+      animation: blink 1s infinite;
+    }
+
+    #clues {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border-soft);
+      font-size: 18px;
+    }
+
+    #suspectSection {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 2px solid var(--border-strong);
+      border-radius: 8px;
+      background: #0a0a0a;
+      box-shadow:
+        0 0 20px rgba(100,200,255,0.1),
+        inset 0 0 20px rgba(0,0,0,0.5);
+      display: none;
+    }
+
+    .suspectBtn {
+      padding: 6px 16px;
+      margin-right: 0;
+      border: 2px solid #4a4a4a;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
+      color: var(--text-main);
+      cursor: pointer;
+      font-family: "VT323", monospace;
+      font-size: 19px;
+      transition: all 0.2s;
+      flex: 1;
+      min-width: 140px;
+    }
+
+    .suspectBtn:hover {
+      background: linear-gradient(180deg, #252525 0%, #151515 100%);
+      border-color: #6f6f6f;
+      box-shadow: 0 0 15px rgba(100,200,255,0.3);
+    }
+    .suspectBtn:disabled {
+      opacity: 0.45;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    #resultMsg {
+      margin-top: 10px;
+      padding: 8px;
+      font-size: 18px;
+      color: var(--text-main);
+      background: #050505;
+      border-radius: 4px;
+      border-left: 3px solid var(--border-strong);
+      min-height: 20px;
+    }
+  </style>
 </head>
+
 <body>
-    <div id="ui-layer">
-        <h1>DREAM MEADOW</h1>
-        <p>Left is Left. Right is Right.</p>
-        <div class="click-start" id="start-btn">ENTER</div>
+<!-- 额外噪点层 -->
+<div style="
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('data:image/svg+xml,%3Csvg viewBox=\"0 0 200 200\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cfilter id=\"noise\"%3E%3CfeTurbulence type=\"fractalNoise\" baseFrequency=\"1.2\" numOctaves=\"5\" stitchTiles=\"stitch\"/%3E%3C/filter%3E%3Crect width=\"100%25\" height=\"100%25\" filter=\"url(%23noise)\" opacity=\"0.5\"/%3E%3C/svg%3E');
+  opacity: 0.35;
+  z-index: 99995;
+  mix-blend-mode: soft-light;
+"></div>
+
+<div class="wrap">
+  <div id="terminal">
+    <div class="header-line">
+      <div class="header-left">
+        <div>&gt; LONDON POLICE ARCHIVE SYSTEM</div>
+        <div>&gt; CASE FILE: WHITECHAPEL_1888</div>
+        <div>&gt; STATUS: RESTORED</div>
+      </div>
+      <button id="restartBtn" onclick="restartCase()">&gt; RESTART CASE</button>
     </div>
 
-    <div id="crosshair"></div>
-    <div id="hud">WASD to Walk | Click Balloons</div>
+    <h3>3 AUDIO LOGS AVAILABLE</h3>
+    <div>Select file to playback:</div>
 
-    <div id="memory-overlay">
-        <div id="memory-content"><img id="memory-image" src="" alt="Memory"></div>
-        <div id="close-btn">CLOSE MEMORY</div>
+    <div class="logs-list">
+      <div class="log-row" onclick="playLog('A')" id="rowA">
+        <span class="log-label">[A]</span>
+        <span class="log-title">Detective_Log.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
+      <div class="log-row" onclick="playLog('B')" id="rowB">
+        <span class="log-label">[B]</span>
+        <span class="log-title">Reporter_Record.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
+      <div class="log-row" onclick="playLog('C')" id="rowC">
+        <span class="log-label">[C]</span>
+        <span class="log-title">Witness_Statement.wav</span>
+        <span class="checkmark">✔</span>
+      </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <div class="small-help">
+      • Click a file to play. Click text area to skip typing animation.
+    </div>
 
-    <script>
-        // --- 1. Audio (Pop Only) ---
-        const AudioSys = {
-            ctx: null, masterGain: null, isInit: false,
-            init: function() {
-                if (this.isInit) return;
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AudioContext();
-                this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = 0.5;
-                this.masterGain.connect(this.ctx.destination);
-                this.isInit = true;
-            },
-            playPop: function() {
-                if (!this.isInit) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(500, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.08);
-                gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
-                osc.connect(gain); gain.connect(this.masterGain);
-                osc.start(); osc.stop(this.ctx.currentTime + 0.1);
-            }
-        };
+    <div id="playback">
+      <!-- 默认占位图：default_scene.png -->
+      <div id="imagePane">
+        <img id="sceneImage" src="default_scene.png" alt="scene image">
+      </div>
+      <div id="textPane" onclick="skipTyping()">
+&gt; Select a log on the left to begin playback.
+      </div>
+    </div>
 
-        // --- 2. Core Variables ---
-        let camera, scene, renderer;
-        let isLocked = false;
-        const moveState = { forward: false, backward: false, left: false, right: false };
-        let lastTime = performance.now();
-        const gravity = 25.0;
-        let verticalVelocity = 0;
+    <div id="clues">
+      <strong>Unlocked Clues:</strong>
+      <ul id="clueList"></ul>
+    </div>
 
-        const memories = [];
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
+    <div id="suspectSection">
+      <div style="margin-bottom: 8px; font-size: 19px; letter-spacing: 0.08em;">
+        <strong>&gt; SUBMIT ACCUSATION</strong>
+      </div>
+      <div style="margin-bottom: 6px; color: var(--text-muted); font-size: 17px;">
+        Select the suspect:
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="suspectBtn" onclick="checkSuspect('detective')">Detective</button>
+        <button class="suspectBtn" onclick="checkSuspect('reporter')">Reporter</button>
+        <button class="suspectBtn" onclick="checkSuspect('witness')">Witness</button>
+      </div>
+      <div id="resultMsg"></div>
+    </div>
 
-        init();
-        animate();
+  </div>
+</div>
 
-        function init() {
-            const container = document.body;
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB);
-            scene.fog = new THREE.FogExp2(0x87CEEB, 0.003);
+<script>
+  const logs = {
+    A: {
+      text:`[Detective Log - 3:05 AM]
 
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-            camera.position.set(0, 2, 20);
-            camera.rotation.order = 'YXZ';
-            scene.add(camera);
+Arrived at scene at 3:05 AM.
+Body is leaning against the wall, but the posture is unnatural.
 
-            // --- Lights ---
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x88ccff, 0.9);
-            scene.add(hemiLight);
+Based on blood pattern analysis, she should have fallen forward,
+not positioned against the wall as she is now.
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(100, 200, 100);
-            dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
-            scene.add(dirLight);
+No drag marks detected, movements were careful.
+This indicates someone repositioned the body.
 
-            // --- Ground (Texture Return) ---
-            const textureLoader = new THREE.TextureLoader();
-            // 使用之前您喜欢的那个真实草地纹理
-            const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
-            grassTexture.wrapS = THREE.RepeatWrapping;
-            grassTexture.wrapT = THREE.RepeatWrapping;
-            grassTexture.repeat.set(50, 50);
+The killer must have been very close to her, and remained calm.`,
+      img: "detective.png",
+      clue: "Body posture is unnatural, indicating it was repositioned by someone."
+    },
+    B: {
+      text:`[Reporter Record - Claims 2:55 AM]
 
-            const planeGeo = new THREE.PlaneGeometry(2000, 2000);
-            const planeMat = new THREE.MeshStandardMaterial({
-                map: grassTexture,
-                roughness: 0.8,
-                metalness: 0.1 // 稍微一点点反光，增加质感
-            });
-            const ground = new THREE.Mesh(planeGeo, planeMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.position.y = 0;
-            ground.receiveShadow = true;
-            scene.add(ground);
+I arrived around 2:55 AM.
+She was already sitting against the wall, just like in the photos later.
 
-            // --- Architecture (White Plaster) ---
-            // 自动生成灰泥纹理，防止纯色太死板
-            function createPlasterNoise() {
-                const c = document.createElement('canvas'); c.width=256; c.height=256;
-                const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,256,256);
-                for(let i=0;i<5000;i++){ ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.1})`; ctx.fillRect(Math.random()*256,Math.random()*256,2,2); }
-                return new THREE.CanvasTexture(c);
-            }
-            const plasterTex = createPlasterNoise();
+I didn't get close, stayed at the alley entrance,
+only saw her silhouette from a distance.
 
-            const cityGroup = new THREE.Group();
-            const geomShapes = [
-                new THREE.BoxGeometry(1, 1, 1),
-                new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
-                new THREE.ConeGeometry(0.5, 1, 32)
-            ];
-            // 柔和的糖果色
-            const pastelColors = [0xffb7b2, 0xffdac1, 0xe2f0cb, 0xb5ead7, 0xc7ceea];
+She appeared to be sitting facing the street,
+as if waiting for someone.`,
+      img: "reporter.png",
+      clue: "Reporter claims to only observe from distance at alley entrance, yet describes body's facing direction."
+    },
+    C: {
+      text:`[Witness Statement - Around 3:00 AM]
 
-            for(let i=0; i<150; i++) {
-                const geo = geomShapes[Math.floor(Math.random() * geomShapes.length)];
-                const col = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+I passed by that alley around 3 AM.
 
-                const mat = new THREE.MeshStandardMaterial({
-                    color: col, map: plasterTex, roughness: 0.9
-                });
-                const mesh = new THREE.Mesh(geo, mat);
+I saw a man very close to her,
+close enough as if checking whether she was dead.
 
-                const x = (Math.random() - 0.5) * 500;
-                const z = (Math.random() - 0.5) * 500;
+He wasn't at the alley entrance,
+he was crouched right in front of her.
 
-                // 避让区：给楼梯留出大片空地
-                if (Math.abs(x) < 40) continue;
+I saw something in his hand reflecting light,
+looked like a metal pen.`,
+      img: "witness.png",
+      clue: "Witness saw man directly in front of the body, holding reflective metal object."
+    }
+  };
 
-                const scale = Math.random() * 8 + 3;
-                mesh.scale.set(scale, scale * (Math.random()*2+1), scale);
-                mesh.position.set(x, mesh.scale.y/2, z);
-                mesh.castShadow = true; mesh.receiveShadow = true;
-                cityGroup.add(mesh);
-            }
-            scene.add(cityGroup);
+  const defaultText = "> Select a log on the left to begin playback.";
+  let unlocked = [];
+  let isTyping = false;
+  let currentTimer = null;
+  let fullText = "";
+  let typingCallback = null;
 
-            // --- Stairs (Pure White) ---
-            const stairGeo = new THREE.BoxGeometry(6.0, 0.5, 2.5);
-            const stairMat = new THREE.MeshStandardMaterial({
-                color: 0xffffff, roughness: 0.5, map: plasterTex
-            });
-            const stairGroup = new THREE.Group();
-            for(let i=0; i<200; i++) {
-                const step = new THREE.Mesh(stairGeo, stairMat);
-                step.position.set(0, i * 0.5 + 0.25, -i * 2.0);
-                step.receiveShadow = true; step.castShadow = true;
-                stairGroup.add(step);
-            }
-            scene.add(stairGroup);
+  function skipTyping() {
+    if (!isTyping || !currentTimer) return;
+    clearInterval(currentTimer);
+    currentTimer = null;
+    isTyping = false;
 
-            // --- Balloons with Strings ---
-            const balloonGeo = new THREE.SphereGeometry(0.8, 32, 32);
-            balloonGeo.scale(1, 1.2, 1);
-            const knotGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.15, 8);
-            const stringGeo = new THREE.CylinderGeometry(0.01, 0.01, 3.0, 4);
-            const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const textEl = document.getElementById("textPane");
+    textEl.textContent = fullText;
 
-            for(let i=0; i<40; i++) {
-                const col = pastelColors[Math.floor(Math.random() * pastelColors.length)];
-                const group = new THREE.Group();
-                const balloonMat = new THREE.MeshStandardMaterial({
-                    color: col, roughness: 0.3, emissive: col, emissiveIntensity: 0.2
-                });
-                const balloon = new THREE.Mesh(balloonGeo, balloonMat);
-                group.add(balloon);
+    const hint = document.getElementById("skipHint");
+    if (hint) hint.remove();
 
-                const knot = new THREE.Mesh(knotGeo, balloonMat);
-                knot.position.y = -1.0; group.add(knot);
-                const string = new THREE.Mesh(stringGeo, stringMat);
-                string.position.y = -2.5; group.add(string);
+    if (typingCallback) {
+      typingCallback();
+      typingCallback = null;
+    }
 
-                const side = Math.random() > 0.5 ? 1 : -1;
-                const x = side * (Math.random() * 30 + 10);
-                const y = Math.random() * 60 + 5;
-                const z = -Math.random() * 250;
-                group.position.set(x, y, z);
+    ["A","B","C"].forEach(k => {
+      document.getElementById("row"+k).classList.remove("disabled");
+    });
+  }
 
-                // [修改] 100% 保证有图的 URL (使用 Seed) + 黑白滤镜
-                // Picsum Seed 保证同一个ID永远是同一张图，不会 404
-                // ?grayscale 参数让图片变黑白，更有"记忆感"
-                group.userData = {
-                    contentUrl: `https://picsum.photos/seed/${i + 100}/800/600?grayscale`,
-                    origY: y,
-                    speed: Math.random() * 0.002 + 0.001
-                };
+  function playLog(key) {
+    if (isTyping) return;
 
-                balloon.userData.parentGroup = group;
-                memories.push(balloon);
-                scene.add(group);
-            }
+    ["A","B","C"].forEach(k => {
+      const row = document.getElementById("row"+k);
+      row.classList.remove("active");
+      row.classList.add("disabled");
+      row.title = "Disabled during playback";
+    });
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.outputEncoding = THREE.sRGBEncoding;
-            container.appendChild(renderer.domElement);
+    const currentRow = document.getElementById("row"+key);
+    currentRow.classList.remove("disabled");
+    currentRow.classList.add("active");
 
-            // --- Events ---
-            const startBtn = document.getElementById('start-btn');
-            const uiLayer = document.getElementById('ui-layer');
-            const crosshair = document.getElementById('crosshair');
-            const memoryOverlay = document.getElementById('memory-overlay');
-            const memoryImage = document.getElementById('memory-image');
-            const closeBtn = document.getElementById('close-btn');
+    const log = logs[key];
 
-            startBtn.addEventListener('click', () => { document.body.requestPointerLock(); AudioSys.init(); });
+    const sceneImg = document.getElementById("sceneImage");
+    if (sceneImg) {
+      sceneImg.src = log.img;
+      sceneImg.alt = "scene image - " + key;
+    }
 
-            document.addEventListener('pointerlockchange', () => {
-                if (document.pointerLockElement === document.body) {
-                    isLocked = true; uiLayer.style.opacity = 0;
-                    setTimeout(()=> uiLayer.style.display='none', 500); crosshair.style.display = 'block';
-                } else {
-                    isLocked = false;
-                    if (memoryOverlay.style.display !== 'flex') {
-                        uiLayer.style.display = 'flex'; setTimeout(()=> uiLayer.style.opacity = 1, 10); crosshair.style.display = 'none';
-                    }
-                }
-            });
+    typeText(log.text, document.getElementById("textPane"), () => {
+      unlockClue(log.clue);
+      markPlayed(key);
+      ["A","B","C"].forEach(k => {
+        const row = document.getElementById("row"+k);
+        row.classList.remove("disabled");
+        row.title = "";
+      });
+    });
+  }
 
-            document.addEventListener('keydown', (e) => { switch(e.code) { case 'KeyW': moveState.forward = true; break; case 'KeyS': moveState.backward = true; break; case 'KeyA': moveState.left = true; break; case 'KeyD': moveState.right = true; break; } });
-            document.addEventListener('keyup', (e) => { switch(e.code) { case 'KeyW': moveState.forward = false; break; case 'KeyS': moveState.backward = false; break; case 'KeyA': moveState.left = false; break; case 'KeyD': moveState.right = false; break; } });
+  function markPlayed(k) {
+    document.getElementById("row"+k).classList.add("played");
+  }
 
-            document.addEventListener('mousemove', (e) => {
-                if (!isLocked) return;
-                camera.rotation.y -= e.movementX * 0.0008;
-                camera.rotation.x -= e.movementY * 0.0008;
-                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-            });
+  function unlockClue(c) {
+    if (!unlocked.includes(c)) unlocked.push(c);
 
-            document.addEventListener('click', () => {
-                if (!isLocked) return;
-                mouse.set(0, 0); raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(memories);
-                if (intersects.length > 0) {
-                    const balloonMesh = intersects[0].object;
-                    const group = balloonMesh.userData.parentGroup;
-                    AudioSys.playPop();
-                    scene.remove(group);
-                    const index = memories.indexOf(balloonMesh);
-                    if (index > -1) memories.splice(index, 1);
-                    showMemory(group.userData.contentUrl);
-                }
-            });
+    document.getElementById("clueList").innerHTML =
+      unlocked.map((v, i) => `<li>[${i+1}] ${v}</li>`).join("");
 
-            function showMemory(url) {
-                document.exitPointerLock(); isLocked = false;
-                memoryImage.src = url; memoryOverlay.style.display = 'flex'; crosshair.style.display = 'none';
-            }
-            closeBtn.addEventListener('click', () => { memoryOverlay.style.display = 'none'; document.body.requestPointerLock(); });
-            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-        }
+    if (unlocked.length === 3) {
+      document.getElementById("suspectSection").style.display = "block";
+    }
+  }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = performance.now();
-            const delta = 0.016;
+  function typeText(text, el, callback) {
+    if (currentTimer) {
+      clearInterval(currentTimer);
+    }
 
-            if (isLocked) {
-                const speed = 1.5 * delta;
+    fullText = text;
+    typingCallback = callback;
+    isTyping = true;
+    el.textContent = "";
+    let i = 0;
 
-                // [关键修复] A/D 移动方向修正
-                // yaw 是相机当前的 Y 轴旋转
-                const yaw = camera.rotation.y;
+    const skipHint = document.createElement("div");
+    skipHint.id = "skipHint";
+    skipHint.textContent = "[Click to skip]";
+    el.appendChild(skipHint);
 
-                // 前进方向 (-Z)
-                const forwardX = -Math.sin(yaw);
-                const forwardZ = -Math.cos(yaw);
+    currentTimer = setInterval(() => {
+      el.textContent = text.substring(0, i);
+      i++;
+      if (i > text.length) {
+        clearInterval(currentTimer);
+        currentTimer = null;
+        isTyping = false;
+        const hint = document.getElementById("skipHint");
+        if (hint) hint.remove();
+        callback && callback();
+        typingCallback = null;
+      }
+    }, 40);
+  }
 
-                // 右侧方向 (+X)
-                // 之前的代码可能是 Math.cos(yaw) 导致反向
-                // 正确的右侧向量 (基于 forward 顺时针旋转 90度)
-                const rightX = -Math.cos(yaw);
-                const rightZ = Math.sin(yaw);
+  function checkSuspect(choice) {
+    document.querySelectorAll(".suspectBtn").forEach(b => b.disabled = true);
+    const result = document.getElementById("resultMsg");
 
-                const moveVec = new THREE.Vector3(0,0,0);
+    if (choice === "reporter") {
+      result.innerHTML =
+        "&gt; <strong style='color: #7f7;'>CORRECT</strong><br>Only the reporter could describe the body position from the killer's perspective.";
+      result.style.borderLeftColor = "#7f7";
+    } else {
+      result.innerHTML =
+        "&gt; <strong style='color: #f77;'>INCORRECT</strong><br>The evidence does not support this accusation.";
+      result.style.borderLeftColor = "#f77";
+    }
+  }
 
-                // W: 前进
-                if (moveState.forward) { moveVec.x += forwardX; moveVec.z += forwardZ; }
-                // S: 后退
-                if (moveState.backward) { moveVec.x -= forwardX; moveVec.z -= forwardZ; }
+  /* Restart Case：重置所有状态 */
+  function restartCase() {
+    // 先把打字机停掉
+    if (isTyping && currentTimer) {
+      clearInterval(currentTimer);
+      currentTimer = null;
+      isTyping = false;
+    }
 
-                // [修正] D: 向右
-                // 如果觉得还是反了，把这里的 += 改成 -= 即可。
-                // 现在的逻辑：Forward(0, -1) -> Right应该在 X+
-                if (moveState.right) { moveVec.x -= rightX; moveVec.z -= rightZ; }
-                // [修正] A: 向左
-                if (moveState.left) { moveVec.x += rightX; moveVec.z += rightZ; }
+    // 图像恢复默认
+    const sceneImg = document.getElementById("sceneImage");
+    if (sceneImg) {
+      sceneImg.src = "default_scene.png";
+      sceneImg.alt = "scene image";
+    }
 
-                if (moveVec.length() > 0) moveVec.normalize().multiplyScalar(speed);
+    // 文本恢复默认
+    const textEl = document.getElementById("textPane");
+    textEl.textContent = defaultText;
 
-                camera.position.x += moveVec.x;
-                camera.position.z += moveVec.z;
+    // 线索重置
+    unlocked = [];
+    document.getElementById("clueList").innerHTML = "";
 
-                // Physics (Stick to floor/stairs)
-                const onStair = Math.abs(camera.position.x) < 3.5 && camera.position.z < 2;
-                let groundHeight = 0;
+    // 行状态重置
+    ["A","B","C"].forEach(k => {
+      const row = document.getElementById("row"+k);
+      row.classList.remove("active","played","disabled");
+      row.title = "";
+    });
 
-                if (onStair && camera.position.z < 0) {
-                    groundHeight = (Math.abs(camera.position.z) / 2.0) * 0.5 + 0.5;
-                }
+    // 嫌疑区重置
+    const section = document.getElementById("suspectSection");
+    section.style.display = "none";
+    const result = document.getElementById("resultMsg");
+    result.textContent = "";
+    result.style.borderLeftColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--border-strong');
 
-                const targetY = groundHeight + 2;
-                if (camera.position.y < targetY) camera.position.y += (targetY - camera.position.y) * 0.2;
-                else if (camera.position.y > targetY + 0.1) camera.position.y -= gravity * delta * 0.5;
-
-                if(camera.position.y < -30) camera.position.set(0, 2, 20);
-            }
-
-            // Animate Balloons
-            scene.traverse((object) => {
-                if (object.isGroup && object.userData.origY) {
-                    object.rotation.y += 0.005;
-                    object.position.y = object.userData.origY + Math.sin(time * object.userData.speed) * 0.5;
-                    object.rotation.z = Math.sin(time * 0.001 + object.position.x) * 0.05;
-                }
-            });
-
-            renderer.render(scene, camera);
-        }
-    </script>
+    document.querySelectorAll(".suspectBtn").forEach(b => b.disabled = false);
+  }
+</script>
 </body>
 </html>

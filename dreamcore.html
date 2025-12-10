@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dreamcore Meadow (Final Fix)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&display=swap');
+
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Comfortaa', cursive; }
+
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: rgba(135, 206, 235, 1.0);
+            transition: opacity 0.8s; z-index: 10;
+        }
+
+        h1 { margin: 0; font-size: 60px; color: #fff; text-shadow: 3px 3px 0px #ff99cc; }
+        p { color: #fff; font-size: 18px; margin-top: 10px; font-weight: bold; }
+
+        .click-start {
+            margin-top: 30px; padding: 15px 50px; background: #fff; color: #87CEEB;
+            border: 4px solid #fff; border-radius: 50px; cursor: pointer; font-size: 16px; font-weight: 900;
+            box-shadow: 0 10px 20px rgba(135, 206, 235, 0.4); transition: transform 0.1s;
+        }
+        .click-start:active { transform: translateY(3px); }
+
+        #hud {
+            position: absolute; bottom: 20px; left: 20px; color: #fff; font-size: 14px; font-weight: bold;
+            text-shadow: 1px 1px 0 rgba(0,0,0,0.1); pointer-events: none; z-index: 5;
+        }
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; background: #fff;
+            border-radius: 50%; border: 3px solid #ff99cc; transform: translate(-50%, -50%);
+            pointer-events: none; z-index: 5; display: none;
+        }
+
+        #memory-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(8px);
+            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20;
+        }
+
+        #memory-content {
+            width: 60%; max-width: 700px; aspect-ratio: 16/9; background: #000;
+            border: 8px solid #fff; border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(100, 149, 237, 0.3);
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+
+        #memory-content img { width: 100%; height: 100%; object-fit: cover; }
+
+        #close-btn {
+            margin-top: 25px; padding: 12px 40px; background: #ff99cc; color: #fff; border: none;
+            cursor: pointer; border-radius: 30px; font-weight: 900; font-size: 14px;
+            transition: transform 0.1s;
+        }
+        #close-btn:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div id="ui-layer">
+        <h1>DREAM MEADOW</h1>
+        <p>Left is Left. Right is Right.</p>
+        <div class="click-start" id="start-btn">ENTER</div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="hud">WASD to Walk | Click Balloons</div>
+
+    <div id="memory-overlay">
+        <div id="memory-content"><img id="memory-image" src="" alt="Memory"></div>
+        <div id="close-btn">CLOSE MEMORY</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // --- 1. Audio (Pop Only) ---
+        const AudioSys = {
+            ctx: null, masterGain: null, isInit: false,
+            init: function() {
+                if (this.isInit) return;
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioContext();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = 0.5;
+                this.masterGain.connect(this.ctx.destination);
+                this.isInit = true;
+            },
+            playPop: function() {
+                if (!this.isInit) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+                osc.connect(gain); gain.connect(this.masterGain);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+            }
+        };
+
+        // --- 2. Core Variables ---
+        let camera, scene, renderer;
+        let isLocked = false;
+        const moveState = { forward: false, backward: false, left: false, right: false };
+        let lastTime = performance.now();
+        const gravity = 25.0;
+        let verticalVelocity = 0;
+
+        const memories = [];
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        init();
+        animate();
+
+        function init() {
+            const container = document.body;
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.FogExp2(0x87CEEB, 0.003);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 2, 20);
+            camera.rotation.order = 'YXZ';
+            scene.add(camera);
+
+            // --- Lights ---
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x88ccff, 0.9);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(100, 200, 100);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            // --- Ground (Texture Return) ---
+            const textureLoader = new THREE.TextureLoader();
+            const grassTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+            grassTexture.wrapS = THREE.RepeatWrapping;
+            grassTexture.wrapT = THREE.RepeatWrapping;
+            grassTexture.repeat.set(50, 50);
+
+            const planeGeo = new THREE.PlaneGeometry(2000, 2000);
+            const planeMat = new THREE.MeshStandardMaterial({
+                map: grassTexture,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const ground = new THREE.Mesh(planeGeo, planeMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = 0;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // --- Architecture (White Plaster) ---
+            function createPlasterNoise() {
+                const c = document.createElement('canvas'); c.width=256; c.height=256;
+                const ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,256,256);
+                for(let i=0;i<5000;i++){ ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.1})`; ctx.fillRect(Math.random()*256,Math.random()*256,2,2); }
+                return new THREE.CanvasTexture(c);
+            }
+            const plasterTex = createPlasterNoise();
+
+            const cityGroup = new THREE.Group();
+            const geomShapes = [
+                new THREE.BoxGeometry(1, 1, 1),
+                new THREE.CylinderGeometry(0.5, 0.5, 1, 32),
+                new THREE.ConeGeometry(0.5, 1, 32)
+            ];
+            const pastelColors = [0xffb7b2, 0xffdac1, 0xe2f0cb, 0xb5ead7, 0xc7ceea];
+
+            for(let i=0; i<150; i++) {
+                const geo = geomShapes[Math.floor(Math.random() * geomShapes.length)];
+                const col = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: col, map: plasterTex, roughness: 0.9
+                });
+                const mesh = new THREE.Mesh(geo, mat);
+
+                const x = (Math.random() - 0.5) * 500;
+                const z = (Math.random() - 0.5) * 500;
+
+                if (Math.abs(x) < 40) continue;
+
+                const scale = Math.random() * 8 + 3;
+                mesh.scale.set(scale, scale * (Math.random()*2+1), scale);
+                mesh.position.set(x, mesh.scale.y/2, z);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                cityGroup.add(mesh);
+            }
+            scene.add(cityGroup);
+
+            // --- Stairs (Pure White) ---
+            const stairGeo = new THREE.BoxGeometry(6.0, 0.5, 2.5);
+            const stairMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff, roughness: 0.5, map: plasterTex
+            });
+            const stairGroup = new THREE.Group();
+            for(let i=0; i<200; i++) {
+                const step = new THREE.Mesh(stairGeo, stairMat);
+                step.position.set(0, i * 0.5 + 0.25, -i * 2.0);
+                step.receiveShadow = true; step.castShadow = true;
+                stairGroup.add(step);
+            }
+            scene.add(stairGroup);
+
+            // --- Balloons with Strings ---
+            const balloonGeo = new THREE.SphereGeometry(0.8, 32, 32);
+            balloonGeo.scale(1, 1.2, 1);
+            const knotGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.15, 8);
+            const stringGeo = new THREE.CylinderGeometry(0.01, 0.01, 3.0, 4);
+            const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            for(let i=0; i<40; i++) {
+                const col = pastelColors[Math.floor(Math.random() * pastelColors.length)];
+                const group = new THREE.Group();
+                const balloonMat = new THREE.MeshStandardMaterial({
+                    color: col, roughness: 0.3, emissive: col, emissiveIntensity: 0.2
+                });
+                const balloon = new THREE.Mesh(balloonGeo, balloonMat);
+                group.add(balloon);
+
+                const knot = new THREE.Mesh(knotGeo, balloonMat);
+                knot.position.y = -1.0; group.add(knot);
+                const string = new THREE.Mesh(stringGeo, stringMat);
+                string.position.y = -2.5; group.add(string);
+
+                const side = Math.random() > 0.5 ? 1 : -1;
+                const x = side * (Math.random() * 30 + 10);
+                const y = Math.random() * 60 + 5;
+                const z = -Math.random() * 250;
+                group.position.set(x, y, z);
+
+                group.userData = {
+                    contentUrl: `https://picsum.photos/seed/${i + 100}/800/600?grayscale`,
+                    origY: y,
+                    speed: Math.random() * 0.002 + 0.001
+                };
+
+                balloon.userData.parentGroup = group;
+                memories.push(balloon);
+                scene.add(group);
+            }
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            container.appendChild(renderer.domElement);
+
+            // --- Events ---
+            const startBtn = document.getElementById('start-btn');
+            const uiLayer = document.getElementById('ui-layer');
+            const crosshair = document.getElementById('crosshair');
+            const memoryOverlay = document.getElementById('memory-overlay');
+            const memoryImage = document.getElementById('memory-image');
+            const closeBtn = document.getElementById('close-btn');
+
+            startBtn.addEventListener('click', () => { document.body.requestPointerLock(); AudioSys.init(); });
+
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === document.body) {
+                    isLocked = true; uiLayer.style.opacity = 0;
+                    setTimeout(()=> uiLayer.style.display='none', 500); crosshair.style.display = 'block';
+                } else {
+                    isLocked = false;
+                    if (memoryOverlay.style.display !== 'flex') {
+                        uiLayer.style.display = 'flex'; setTimeout(()=> uiLayer.style.opacity = 1, 10); crosshair.style.display = 'none';
+                    }
+                }
+            });
+
+            document.addEventListener('keydown', (e) => { switch(e.code) { case 'KeyW': moveState.forward = true; break; case 'KeyS': moveState.backward = true; break; case 'KeyA': moveState.left = true; break; case 'KeyD': moveState.right = true; break; } });
+            document.addEventListener('keyup', (e) => { switch(e.code) { case 'KeyW': moveState.forward = false; break; case 'KeyS': moveState.backward = false; break; case 'KeyA': moveState.left = false; break; case 'KeyD': moveState.right = false; break; } });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isLocked) return;
+                camera.rotation.y -= e.movementX * 0.0008;
+                camera.rotation.x -= e.movementY * 0.0008;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            });
+
+            document.addEventListener('click', () => {
+                if (!isLocked) return;
+                mouse.set(0, 0); raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(memories);
+                if (intersects.length > 0) {
+                    const balloonMesh = intersects[0].object;
+                    const group = balloonMesh.userData.parentGroup;
+                    AudioSys.playPop();
+                    scene.remove(group);
+                    const index = memories.indexOf(balloonMesh);
+                    if (index > -1) memories.splice(index, 1);
+                    showMemory(group.userData.contentUrl);
+                }
+            });
+
+            function showMemory(url) {
+                document.exitPointerLock(); isLocked = false;
+                memoryImage.src = url; memoryOverlay.style.display = 'flex'; crosshair.style.display = 'none';
+            }
+            closeBtn.addEventListener('click', () => { memoryOverlay.style.display = 'none'; document.body.requestPointerLock(); });
+            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = 0.016;
+
+            if (isLocked) {
+                const speed = 1.5 * delta;
+
+                const yaw = camera.rotation.y;
+
+                const forwardX = -Math.sin(yaw);
+                const forwardZ = -Math.cos(yaw);
+
+                const rightX = -Math.cos(yaw);
+                const rightZ = Math.sin(yaw);
+
+                const moveVec = new THREE.Vector3(0,0,0);
+
+                if (moveState.forward) { moveVec.x += forwardX; moveVec.z += forwardZ; }
+                if (moveState.backward) { moveVec.x -= forwardX; moveVec.z -= forwardZ; }
+                if (moveState.right) { moveVec.x -= rightX; moveVec.z -= rightZ; }
+                if (moveState.left) { moveVec.x += rightX; moveVec.z += rightZ; }
+
+                if (moveVec.length() > 0) moveVec.normalize().multiplyScalar(speed);
+
+                camera.position.x += moveVec.x;
+                camera.position.z += moveVec.z;
+
+                const onStair = Math.abs(camera.position.x) < 3.5 && camera.position.z < 2;
+                let groundHeight = 0;
+
+                if (onStair && camera.position.z < 0) {
+                    groundHeight = (Math.abs(camera.position.z) / 2.0) * 0.5 + 0.5;
+                }
+
+                const targetY = groundHeight + 2;
+                if (camera.position.y < targetY) camera.position.y += (targetY - camera.position.y) * 0.2;
+                else if (camera.position.y > targetY + 0.1) camera.position.y -= gravity * delta * 0.5;
+
+                if(camera.position.y < -30) camera.position.set(0, 2, 20);
+            }
+
+            // Animate Balloons
+            scene.traverse((object) => {
+                if (object.isGroup && object.userData.origY) {
+                    object.rotation.y += 0.005;
+                    object.position.y = object.userData.origY + Math.sin(time * object.userData.speed) * 0.5;
+                    object.rotation.z = Math.sin(time * 0.001 + object.position.x) * 0.05;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

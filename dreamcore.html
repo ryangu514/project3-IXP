@@ -274,21 +274,30 @@
 
             // Start game function
             function startGame() {
+                console.log('Starting game...');
                 AudioSys.init();
                 isLocked = true;
                 uiLayer.style.opacity = 0;
                 setTimeout(() => {
                     uiLayer.style.display = 'none';
                     crosshair.style.display = 'block';
+                    console.log('Game started! Use WASD to move, mouse to look around.');
                 }, 500);
 
-                // Try to request pointer lock (may fail in some contexts, but game still works)
-                document.body.requestPointerLock().catch(() => {
-                    console.log('Pointer lock not available, but game will still work');
-                });
+                // Try to request pointer lock (optional, game works without it)
+                try {
+                    document.body.requestPointerLock();
+                } catch(e) {
+                    console.log('Pointer lock not available:', e);
+                }
             }
 
             startBtn.addEventListener('click', startGame);
+
+            // Also handle pointer lock errors
+            document.addEventListener('pointerlockerror', () => {
+                console.log('Pointer lock error, but game still works');
+            });
 
             // Handle pointer lock changes (with browser prefixes)
             function onPointerLockChange() {

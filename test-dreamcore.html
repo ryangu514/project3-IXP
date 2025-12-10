@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Dreamcore Test</title>
+    <style>
+        body { 
+            margin: 0; 
+            font-family: Arial; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            background: #87CEEB; 
+        }
+        #start-btn { 
+            padding: 20px 40px; 
+            font-size: 20px; 
+            cursor: pointer; 
+            background: white; 
+            border: 3px solid #ff99cc;
+            border-radius: 10px;
+        }
+        #start-btn:hover { background: #f0f0f0; }
+        #message { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            font-size: 30px; 
+            color: white; 
+            display: none; 
+        }
+    </style>
+</head>
+<body>
+    <button id="start-btn">CLICK ME TO TEST</button>
+    <div id="message">✓ BUTTON WORKS!</div>
+    
+    <script>
+        console.log('Script loaded!');
+        
+        const btn = document.getElementById('start-btn');
+        const msg = document.getElementById('message');
+        
+        btn.addEventListener('click', function() {
+            console.log('Button clicked!');
+            alert('Button works! If you see this, JavaScript is running.');
+            btn.style.display = 'none';
+            msg.style.display = 'block';
+        });
+        
+        console.log('Event listener attached!');
+    </script>
+</body>
+</html>
